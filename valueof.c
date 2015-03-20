@@ -3,31 +3,31 @@
 #include <stdlib.h>
 //a struct that will represent our Scheme objects. 
 struct object {
-	enum {
-		type_null,
-		type_pair,
-		type_symbol,
-		type_integer,
-		type_void
-	} type;
+  enum {
+    type_null,
+    type_pair,
+    type_symbol,
+    type_integer,
+    type_void
+  } type;
   
-	union {
-		struct pair *pair;
-		const char *symbol;
-		long integer;
-	} value;
+  union {
+    struct pair *pair;
+    const char *symbol;
+    long integer;
+  } value;
 };
 
 
 //Error Messages
 
 typedef enum {
-	error_valid = 0,
-	error_invalid_int,
-	error_mismatched_paren,
-	error_invalid_app,
-	error_undefined_var,
-	error_invalid_syntax
+  error_valid = 0,
+  error_invalid_int,
+  error_mismatched_paren,
+  error_invalid_app,
+  error_undefined_var,
+  error_invalid_syntax
 } error;
 
 
@@ -35,7 +35,7 @@ typedef enum {
 //a struct that will represent a Pair.
 
 struct pair {
-	struct object objs[2];
+  struct object objs[2];
 };
 
 typedef struct object object;
@@ -70,19 +70,22 @@ object make_sym(const char *s);
 object make_int(long x);
 object make_void();
 
-int lex_input(char *s, char **start, char **end);
+int lex_input(char *s, char *start, char *end);
 	
 
 
 //functions to parse user input
 int parse_input(char *s, object *o);
-int parse_int(char *s, object *o);
+int parse_int(char *s, object *o, int pos);
 int parse_sym(char *s, object *o);
 //object parse_list(char *s);
 int parse_exp(char *s, object *o);
 
 //prints an object
 void print_expr(object o);
+
+//prints error message
+void print_error(int err);
 
 //the actual interpreter
 object value_of(object sym, object env);
@@ -99,15 +102,15 @@ object apply_env(object env, object sym);
 #define pairp(o) ((o).type == type_pair)
 
 int listp(object expr) {
-	if (nullp(expr)) {
-		return 1;
-	}
-	else if (!pairp(expr)) {
-		return 0;
-	}
-	else {
-		listp(cdr(expr));
-	}
+  if (nullp(expr)) {
+    return 1;
+  }
+  else if (!pairp(expr)) {
+    return 0;
+  }
+  else {
+    listp(cdr(expr));
+  }
 }
 
 #define intp(c) ((c) >= 48) && ((c) <= 57)
@@ -124,19 +127,22 @@ static const object null = { type_null };
 /*========MAIN==========*/
 
 int main() {
-	char str[1000];
-	object o;
-	while(strcmp(str, "exit") != 0) {
-		printf("> ");
-		gets(str);
-		o = parse_input(str);
-		print_expr(o);
-		printf("\n");
-	}
-  
-
-
-	return 0;
+  char str[1000];
+  object o;
+  int err;
+  while(strcmp(str, "exit") != 0) {
+    printf("> ");
+    gets(str);
+    err = parse_input(str, &o);
+    if (!err) {
+    print_expr(o);
+    printf("\n");
+    }
+    else {
+      print_error(err); 
+    }
+  }
+  return 0;
 }
 
 
@@ -145,90 +151,110 @@ int main() {
 //Implementing cons. Takes two objects, the first being any object and the second being a pair and returns a newly allocated pair.
 
 object make_pair(object a, object d) {
-	object o;
-	o.type = type_pair;
-	o.value.pair = malloc(sizeof(struct pair));
-	car(o) = a;
-	cdr(o) = d;
-	return o;
+  object o;
+  o.type = type_pair;
+  o.value.pair = malloc(sizeof(struct pair));
+  car(o) = a;
+  cdr(o) = d;
+  return o;
 }
 
 //makes an int object, sets the type and the value.
 object make_int(long x) {
-	object o;
-	o.type = type_integer;
-	o.value.integer = x;
-	return o;
+  object o;
+  o.type = type_integer;
+  o.value.integer = x;
+  return o;
 }
 
 //makes a symbol object, takes a string, and duplicates it and sets it as the value.
 object make_sym(const char *s) {
-	object o;
-	o.type = type_symbol;
-	o.value.symbol = strdup(s);
-	return o;
+  object o;
+  o.type = type_symbol;
+  o.value.symbol = strdup(s);
+  return o;
 }
 
 //returns the void object
 object make_void() {
-	object o;
-	o.type = type_void;
-	return o;
+  object o;
+  o.type = type_void;
+  return o;
 }
 
 void print_expr(object o) {
-	switch (o.type) {
-	case type_null:
-		printf("()");
-		break;
-	case type_pair:
-		putchar('(');
-		print_expr(car(o)); //prints the car, and sets the object to the cdr.
-		o = cdr(o);
-		while (!nullp(o)) {
-			if (pairp(o)) {
-				putchar(' ');
-				print_expr(car(o));
-				o = cdr(o);
-			}
-			else {
-				printf(" . ");
-				print_expr(o);
-				break;
-			}
-		}
-		putchar(')');
-		break;
-	case type_symbol:
-		printf("%s",o.value.symbol);
-		break;
-	case type_integer:
-		printf("%ld",o.value.integer);
-		break;
-	default:
-		printf("Error: not a proper object\n");
-	}
+  switch (o.type) {
+  case type_null:
+    printf("()");
+    break;
+  case type_pair:
+    putchar('(');
+    print_expr(car(o)); //prints the car, and sets the object to the cdr.
+    o = cdr(o);
+    while (!nullp(o)) {
+      if (pairp(o)) {
+        putchar(' ');
+        print_expr(car(o));
+        o = cdr(o);
+      }
+      else {
+        printf(" . ");
+        print_expr(o);
+        break;
+      }
+    }
+    putchar(')');
+    break;
+  case type_symbol:
+    printf("%s",o.value.symbol);
+    break;
+  case type_integer:
+    printf("%ld",o.value.integer);
+    break;
+  default:
+    printf("Error: not a proper object\n");
+  }
 }
+
+ void print_error(int err) {
+   switch (err) {
+   case error_invalid_int :
+     printf("Invalid integer. \n");
+     break;
+   case error_mismatched_paren :
+     printf("Mismatched parenthesis. \n");
+     break;
+   case error_invalid_app :
+     printf("Invalid function application. \n");
+     break;
+   case error_undefined_var :
+     printf("Undefined variable. \n");
+     break;
+   case error_invalid_syntax :
+     printf("Invalid syntax. \n");
+     break;
+   }
+ }
 
 
 //finds the starting and ending place in s of the first token
-ints lex_input(char *s, char *start, char *end) {
-	s += strspn(s,whitespace); //skips pointless whitespace
+int lex_input(char *s, char *start, char *end) {
+  s += strspn(s,whitespace); //skips pointless whitespace
 
-	if (s[0] == '\0') {//if null char, then we know the user entered onlywhitespace
-		end = NULL;
-		start = NULL;
-		return error_invalid_syntax;
-	}
-	start = s; //else we know something besides whitespace was found
-	if (strchr(parens,s[0]) != NULL) { //if the first character is either a left/right paren
-		end = s+1; //then the end should be the vary next space. 
-	}
-	else {
-		end = s + strcspn(s, endtoken); //if its not a paren, then its a symbol, and we will scan
-		//until we hit whitespace, or a paren
-	}
-	return error_valid; //if we get here, then we know there aren't any errors. 
+  if (s[0] == '\0') {//if null char, then we know the user entered onlywhitespace
+    end = NULL;
+    start = NULL;
+    return error_invalid_syntax;
+  }
+  start = s; //else we know something besides whitespace was found
+  if (strchr(parens,s[0]) != NULL) { //if the first character is either a left/right paren
+    end = s+1; //then the end should be the vary next space. 
+  }
+  else {
+    end = s + strcspn(s, endtoken); //if its not a paren, then its a symbol, and we will scan
+    //until we hit whitespace, or a paren
+  }
+  return error_valid; //if we get here, then we know there aren't any errors. 
 		
   
 }
@@ -237,82 +263,90 @@ ints lex_input(char *s, char *start, char *end) {
 
 //this will parse user input in the repl, and either throw an error
 //or return an object. 
-object parse_input(char *s) {
-	char first = s[0];
-	char second = s[1];
-	object o;
-	if (intp(first)) {//first char is a number
-		return parse_int(s);			
-	}
-	else if (first == 39 && second == '(' ) { //39 is ascii for quote, so this is a list 
-		//return parse_list(s);
-	}
-	else if (first == 39) { //quote without a paren, means symbol
-		return parse_sym(s);
-	}
-	else if (first == '(') { //function application
-		return parse_exp(s);
-	}
-	else { //error
-		printf("Not a valid input. \n");
-		return make_void();
-	}
+int parse_input(char *s, object *o) {
+  char first = s[0];
+  char second = s[1];
+  if (intp(first)) {//first char is a number
+    return parse_int(s, o, 1);			
+  }
+  else if (first == '-' && intp(second)) {
+    s[0] = '0';
+    return parse_int(s, o, 0);
+  }
+  else if (first == 39 && second == '(' ) { //39 is ascii for quote, so this is a list 
+    //return parse_list(s);
+  }
+  else if (first == 39) { //quote without a paren, means symbol
+    return parse_sym(s, o);
+  }
+  else if (first == '(') { //function application
+    return parse_exp(s, o);
+  }
+  else { //error
+    return error_invalid_syntax;
+  }
 }
 
-object parse_int(char *s) {
-	int i = 0;
-	long num = 0;
-	while (s[i] != '\0') {
-		if (intp(s[i])) {
-			num = (10 * (num + (s[i] - '0'))); //converts char to int, and then accumulates it.
-		}
-		else { //input error
-			printf("Invalid Number. \n");
-			return make_void();
-		}
-		i++;
-	}
-	return make_int(num/10);
+int parse_int(char *s, object *o, int pos) {
+  int i = 0;
+  long num = 0;
+  while (s[i] != '\0') {
+    if (intp(s[i])) {
+      num = (10 * (num + (s[i] - '0'))); //converts char to int, and then accumulates it.
+    }
+    else { //input error
+      return error_invalid_int;
+    }
+    i++;
+  }
+  if (pos) {
+    *o = make_int(num/10);
+  }
+  else {
+    *o = make_int( -1 * (num/10));
+  }
+  return error_valid;
 }
 
 
-object parse_sym(char *s) {
-	return make_sym(s);
+int parse_sym(char *s, object *o) {
+  *o = make_sym(s);
+  return error_valid;
 }
 
-object parse_exp(char *s) {
-	return make_void();
+int parse_exp(char *s, object *o) {
+  return error_valid;
 }
 
 
 
 //============Env functions==================
 object empty_env() {
-	return null;
+  return null;
 }
 //adds a symbol and its corresponding value to the front of the env.
 object extend_env(object sym, object val, object env) {
-	object a = make_pair(sym,val);
-	env = make_pair(a,env);
-	return env;
+  object a = make_pair(sym,val);
+  env = make_pair(a,env);
+  return env;
 }
 
 //looks up a symbol and returns its corresponding value in the environment
 object apply_env(object sym, object env) {
   
-	if (nullp(env)){
-		printf("Error: Unbound variable %s\n",sym.value.symbol);
-    }
+  if (nullp(env)){
+    printf("Error: Unbound variable %s\n",sym.value.symbol);
+  }
     
-    else {
-		object a = car(env);
-		if (strcmp(car(a).value.symbol, sym.value.symbol) == 0) {
-			return cdr(a);
-		}
-		else {
-			return apply_env(sym,cdr(env));
-		}
+  else {
+    object a = car(env);
+    if (strcmp(car(a).value.symbol, sym.value.symbol) == 0) {
+      return cdr(a);
     }
+    else {
+      return apply_env(sym,cdr(env));
+    }
+  }
 }
    
     
