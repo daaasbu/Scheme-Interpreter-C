@@ -75,10 +75,10 @@ int lex_input(char *s, char *start, char *end);
 
 
 //functions to parse user input
-int parse_input(char *s, object *o);
-int parse_int(char *s, object *o, int pos);
-int parse_sym(char *s, object *o);
-//object parse_list(char *s);
+int parse_input(char *s, char *end, object *o);
+int parse_int(char *s, object *o, int pos, char *end);
+int parse_sym(char *s, object *o, char *end);
+int parse_list(char *s, char *start, object *o, char *end, int count);
 int parse_exp(char *s, object *o);
 
 //prints an object
@@ -133,7 +133,7 @@ int main() {
   while(strcmp(str, "exit") != 0) {
     printf("> ");
     gets(str);
-    err = parse_input(str, &o);
+    err = parse_input(str, str+strlen(str), &o);
     if (!err) {
     print_expr(o);
     printf("\n");
@@ -141,7 +141,7 @@ int main() {
     else {
       print_error(err); 
     }
-  }
+  } 
   return 0;
 }
 
@@ -255,42 +255,41 @@ int lex_input(char *s, char *start, char *end) {
     //until we hit whitespace, or a paren
   }
   return error_valid; //if we get here, then we know there aren't any errors. 
-		
-  
 }
 
 
 
 //this will parse user input in the repl, and either throw an error
 //or return an object. 
-int parse_input(char *s, object *o) {
+int parse_input(char *s, char *end, object *o) {
   char first = s[0];
   char second = s[1];
   if (intp(first)) {//first char is a number
-    return parse_int(s, o, 1);			
+    return parse_int(s, o, 1, end);			
   }
   else if (first == '-' && intp(second)) {
     s[0] = '0';
-    return parse_int(s, o, 0);
+    return parse_int(s, o, 0, end);
   }
   else if (first == 39 && second == '(' ) { //39 is ascii for quote, so this is a list 
-    //return parse_list(s);
+    char *e;
+    return parse_list(s,s+1,o,e,1);
   }
   else if (first == 39) { //quote without a paren, means symbol
-    return parse_sym(s, o);
+    return parse_sym(s, o, end);
   }
   else if (first == '(') { //function application
-    return parse_exp(s, o);
+    //    return parse_exp(s, o);
   }
   else { //error
     return error_invalid_syntax;
   }
 }
 
-int parse_int(char *s, object *o, int pos) {
+int parse_int(char *s, object *o, int pos, char *end) {
   int i = 0;
   long num = 0;
-  while (s[i] != '\0') {
+  while (s[i] != '\0' || s == end) { //either we hit the null or we hit end
     if (intp(s[i])) {
       num = (10 * (num + (s[i] - '0'))); //converts char to int, and then accumulates it.
     }
@@ -309,10 +308,28 @@ int parse_int(char *s, object *o, int pos) {
 }
 
 
-int parse_sym(char *s, object *o) {
-  *o = make_sym(s);
+int parse_sym(char *s, object *o, char *end) {
+  char cpy[end-s];
+  memcpy(cpy, s, end-s);
+  cpy[end-s] = '\0';
+  *o = make_sym(cpy);
   return error_valid;
 }
+
+//s is the whole string, start will mark the beginning of the specific list, end will find its matching right paren
+//count is to keep track of the parens in the entire list. 
+int parse_list(char *s, char *start, object *o, char *end, int count) {
+  int nbal = 1; //a local count of the parens
+  if (nbal) {
+    
+  }
+
+  else { //if 0, then we know we have processed this list
+
+  }
+  
+}
+
 
 int parse_exp(char *s, object *o) {
   return error_valid;
